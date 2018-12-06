@@ -20,17 +20,26 @@ void setCursorOff();
 void setCursorOn();
 void setCursorMovingRight();
 void setCursorMovingLeft();
+void setCursorPosition(char iPosition);
 void setDisplayMovingRight();
 void setDisplayMovingLeft();
 void moveCursorRight();
 void moveCursorLeft();
 void clearDisplay();
 void moveCursorToHome();
+void delay2us();
 
 
 
 char mDisplayOnOffReg;
 char mCursorDisplayShiftReg;
+char mWritingPosition;
+
+#define DDRAM_Address_Line_1_Position_1 0x00
+#define DDRAM_Address_Line_2_Position_1 0x40
+#define DDRAM_Address_Line_3_Position_1 0x14
+#define DDRAM_Address_Line_4_Position_1 0x54
+
 #define RS PORTAbits.RA4
 #define RW PORTCbits.RC5
 #define E PORTCbits.RC4

@@ -33,14 +33,9 @@ void main(void)
   ANSEL = 0x00; //Setting All to digital
   TRISA = 0x00; //Setting the portA as output
   TRISC = 0x00; //Setting the portA as output
-  __delay_ms(1000);
   int flash=1;
 
   initLCD();
-  FlashLed(flash++);
-  __delay_ms(5000);
-
-   FlashLed(2);
   int wTestCase = 1;
   while(1)
   {
@@ -59,21 +54,17 @@ void main(void)
     {
       case 1:
         lcdWriteText("Test 1: setCursorON()");
-        __delay_ms(100);
-        setCursorOn();
+        //setCursorOn();
       break;
       case 2:
         lcdWriteText("Test 2: enable Cursor");
-        __delay_ms(100);
-        setCursorOn();
-        __delay_ms(100);
-        setBlinkingCursor();
+        //setCursorOn();
+        //setBlinkingCursor();
       break;
       default:
        wTestCase = 0;
        lcdWriteText("Program Completed");
        FlashLed(3);
-       __delay_ms(10000);
        break;
     }
 

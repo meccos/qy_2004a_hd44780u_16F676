@@ -45,11 +45,11 @@ void initLCD()
   mDisplayOnOffReg = 0x0F; //Display ON.
   mCursorDisplayShiftReg= 0x06;
   writeInsChk(mDisplayOnOffReg);
-  __delay_ms(2);
+
   clearDisplay();
-  __delay_ms(2);
   writeInsChk(0x06); //Entry mode set - I/D = 1 (increment cursor) & S = 0 (no shift) 
-  __delay_us(37); 
+  mWritingPosition=1;
+
 }
 
 void lcdWriteText(char *iText)
@@ -63,9 +63,6 @@ void lcdWriteText(char *iText)
 
 void setData(char iValue)
 {
-  RS = RS_INSTRUCTION;
-  RW = RW_WRITE;
-  __delay_us(1);
   E = 1;
   DB7 = (iValue & 0x8) >> 3;
   DB6 = (iValue & 0x4) >> 2;
@@ -74,37 +71,36 @@ void setData(char iValue)
   __delay_us(1);            //to meet Tdsw + Tpw
   E = 0;
   __delay_us(1);
-  DB7 = 1;
-  DB6 = 1;
-  DB5 = 1;
-  DB4 = 1;
 }
 
 void writeTxtChk(char iOpCode)
 {
+  switch(mWritingPosition)
+  {
+    case 21:
+      setCursorPosition(DDRAM_Address_Line_2_Position_1);
+      break;
+    case 41:
+      setCursorPosition(DDRAM_Address_Line_3_Position_1);
+      break;
+    case 61:
+      setCursorPosition(DDRAM_Address_Line_4_Position_1);
+      break;
+    case 81:
+      setCursorPosition(DDRAM_Address_Line_1_Position_1);
+      break;
+    default:
+      break;
+  }
   waitLCDBusy();
-  
+
   SetToSendDataToLCD();
-  
   RS = RS_DATA_REGISTER;
   RW = RW_WRITE;
-  __delay_us(100);
-  E = 1;
-  DB7 = (iOpCode & 0x80) >> 7;
-  DB6 = (iOpCode & 0x40) >> 6;
-  DB5 = (iOpCode & 0x20) >> 5;
-  DB4 = (iOpCode & 0x10) >> 4;
-  __delay_us(100);            //to meet Tdsw + Tpw
-  E = 0;
-  __delay_us(200);            //to meet Tc + Th
-  E = 1;
-  DB7 = (iOpCode & 0x8) >> 3;
-  DB6 = (iOpCode & 0x4) >> 2;
-  DB5 = (iOpCode & 0x2) >> 1;
-  DB4 = (iOpCode & 0x1) ;
-  __delay_us(100);            //to meet Tdsw
-  E = 0;
-  __delay_us(100);            //to meet Tc + Th
+  setData(iOpCode >> 4);
+  setData(iOpCode);
+  __delay_us(1);            //to meet Tc + Th
+  mWritingPosition++;
 }
 
 void writeInsChk(char iOpCode)
@@ -118,22 +114,8 @@ void writeInsNoChk(char iOpCode)
   SetToSendDataToLCD();
   RS = RS_INSTRUCTION;
   RW = RW_WRITE;
-  __delay_us(100);
-  E = 1;
-  DB7 = (iOpCode & 0x80) >> 7;
-  DB6 = (iOpCode & 0x40) >> 6;
-  DB5 = (iOpCode & 0x20) >> 5;
-  DB4 = (iOpCode & 0x10) >> 4;
-  __delay_us(100);            //to meet Tdsw + Tpw
-  E = 0;
-  __delay_us(200);            //to meet Tc + Th
-  E = 1;
-  DB7 = (iOpCode & 0x8) >> 3;
-  DB6 = (iOpCode & 0x4) >> 2;
-  DB5 = (iOpCode & 0x2) >> 1;
-  DB4 = (iOpCode & 0x1) ;
-  __delay_us(100);            //to meet Tdsw + Tpw
-  E = 0;
+  setData(iOpCode >> 4);
+  setData(iOpCode);
 }
 
 void SetToReadDataFromLCD()
@@ -170,8 +152,6 @@ void waitLCDBusy()
     E = 1;
     __delay_us(1);            //to meet Tddr + Tpw
   }
-  __delay_us(1);            //to meet Tah
-  __delay_ms(10);
 }
 void powerOffLcd()
 {
@@ -242,4 +222,15 @@ void clearDisplay()
 void moveCursorToHome()
 {
   writeInsChk(0x02);
+  mWritingPosition=1;
+}
+void setCursorPosition(char iPosition)
+{
+  waitLCDBusy();
+  
+  SetToSendDataToLCD();
+  RS = RS_INSTRUCTION;
+  RW = RW_WRITE;
+  setData((iPosition >> 4) | 0x8 );
+  setData(iPosition);
 }
