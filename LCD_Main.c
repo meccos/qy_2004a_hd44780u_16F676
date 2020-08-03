@@ -47,7 +47,6 @@ uint8_t wTrial=0;
 
 
 uint8_t  gErrorCode;
-
 void Uint8ToTxt(uint8_t iVal, char* oText )
 {
     uint8_t wTen;
@@ -74,6 +73,177 @@ void Uint8ToTxt(uint8_t iVal, char* oText )
     oText[wPos] = '0' + wUnity;
     wPos++;
     oText[wPos] = 0;
+}
+
+void Uint16ToTxt(uint16_t iVal, char* oText )
+{
+    uint8_t wTenThousand;
+    uint8_t wThousand;
+    uint8_t wTen;
+    uint8_t wUnity;
+    uint8_t wHundred;
+    uint8_t wPos=0;
+
+    wTenThousand = iVal/10000;
+    iVal = iVal % 10000;
+    wThousand = iVal/1000;
+    iVal = iVal % 1000;    
+    wHundred = iVal/100;
+    iVal = iVal % 100;
+    wTen = iVal/10;
+    iVal = iVal %10;
+    wUnity = iVal;
+
+    if(wTenThousand !=0 )
+    {
+        oText[0] = '0' + wTenThousand;
+        wPos++;
+    }
+    if(wThousand !=0 )
+    {
+        oText[wPos] = '0' + wThousand;
+        wPos++;
+    }
+    if(wHundred !=0 )
+    {
+        oText[wPos] = '0' + wHundred;
+        wPos++;
+    }
+    if(wTen != 0)
+    {
+      oText[wPos] = '0' + wTen;
+      wPos++;
+    }
+    oText[wPos] = '0' + wUnity;
+    wPos++;
+    oText[wPos] = '\0';
+}
+
+void SetTimer1AndTimer0(float iTime) //Time in Second
+{
+	uint16_t wPreScaler = 0x1;
+	uint8_t wLastGoodPreScaler = -1;
+	uint32_t wTimer0Update = _XTAL_FREQ;
+	wTimer0Update = wTimer0Update / 4; // Internal instruction cycle clock (FOSC/4)
+
+	const uint32_t wMaxNumberofCycle = 0xFFFF00;
+
+	float wMaxTime;
+
+	for (int8_t wPrescaler = 8; wPrescaler> -1; wPrescaler--)
+	{
+		uint16_t wTempPrescaler = 1;
+		wMaxTime = ((float)wMaxNumberofCycle * (wTempPrescaler << wPrescaler)) / wTimer0Update;
+		if (wMaxTime > (iTime))
+		{
+			wLastGoodPreScaler = wPrescaler;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	OPTION_REGbits.TMR0CS = 0;  // using Internal instruction cycle clock (FOSC/4) to increment TIMER0
+    INTCONbits.TMR0IE = 0; //Interrupt on timer0
+    INTCONbits.TMR0IF = 0; //No interrupt on timer0 overflow
+    
+    T1CONbits.TMR1CS = 0; //Clock select OCS/4
+    T1CONbits.T1CKPS = 0; //prescaler 1:1
+    T1CONbits.T1OSCEN = 0; //Not used for this setup
+    T1CONbits.nT1SYNC = 1; //Sync ,,,
+    
+    T1GCONbits.T1GSS = 1; // TMR0 overflow GatePin
+    T1GCONbits.T1GTM = 0; //disabling the toggle mode
+    T1GCONbits.T1GSPM = 1; //Detect single pulse from tmr0 overflow
+    T1GCONbits.T1GGO_nDONE = 1;
+    T1GCONbits.TMR1GE = 1; //TMr1 counts controller by gate
+    T1GCONbits.T1GPOL = 1; //TMr1 counts when gate is high
+    PIR1bits.TMR1GIF = 0; //Disabling timer1 Gate interrupt flag
+    
+    
+	uint32_t wNbOfTimer0Increment = 0;
+	if (wLastGoodPreScaler == 0)
+	{
+		OPTION_REGbits.PSA = 1; //No prescaler to timer 0
+		wNbOfTimer0Increment = iTime * wTimer0Update;
+
+	}
+	else
+	{
+		OPTION_REGbits.PSA = 0; //Prescaler enable to timer 0
+		OPTION_REGbits.PS = wLastGoodPreScaler - 1;
+		wNbOfTimer0Increment = iTime * wTimer0Update / (1 << wLastGoodPreScaler);
+	}
+      char wPrintBuffer[21];
+	  Uint16ToTxt(0xffff - (wNbOfTimer0Increment / 256),wPrintBuffer);
+      setCursorPosition(2,0);
+      lcdWriteText("TMR1:");
+      lcdWriteText(wPrintBuffer);
+      setCursorPosition(2,11);
+      lcdWriteText("TMR0:");
+      Uint8ToTxt(255 - (wNbOfTimer0Increment % 256),wPrintBuffer);
+      lcdWriteText(wPrintBuffer);
+      setCursorPosition(3,0);
+      lcdWriteText("Pres:");
+      Uint8ToTxt(wLastGoodPreScaler - 1,wPrintBuffer);
+      lcdWriteText(wPrintBuffer);
+
+    
+    PIE1bits.TMR1IE = 1; //Enabling timer 1 interrupt
+    PIE1bits.TMR1GIE = 1; //Enable the gate interrupt to reset the Pulse
+    INTCONbits.PEIE = 1; //Enabling Peripheral interrupt
+    INTCONbits.GIE = 1; //Enabling interrupt
+    T1CONbits.TMR1ON = 1;
+    
+    TMR1 = 0xffff - (wNbOfTimer0Increment / 256);
+    TMR0 = 255 - (wNbOfTimer0Increment % 256);
+}
+
+
+
+void Uint16DecimalToTxt(uint16_t iVal, char* oText )
+{
+    uint8_t wThousand;
+    uint8_t wHundred;
+    uint8_t wTen;
+    uint8_t wUnity;
+    uint8_t wDecimal;
+    uint8_t wPos=0;
+
+    wThousand = iVal/10000;
+    iVal = iVal % 10000;
+    wHundred = iVal/1000;
+    iVal = iVal % 1000;    
+    wTen = iVal/100;
+    iVal = iVal % 100;
+    wUnity = iVal/10;
+    iVal = iVal %10;
+    wDecimal = iVal;
+
+    if(wThousand !=0 )
+    {
+        oText[0] = '0' + wThousand;
+        wPos++;
+    }
+    if(wHundred !=0 )
+    {
+        oText[wPos] = '0' + wHundred;
+        wPos++;
+    }
+    if(wTen != 0)
+    {
+      oText[wPos] = '0' + wTen;
+      wPos++;
+    }
+
+    oText[wPos] = '0' + wUnity;
+    wPos++;
+    oText[wPos] = ',';
+    wPos++;
+    oText[wPos] = '0' + wDecimal;
+    wPos++;
+    oText[wPos] = '\0';
 }
 
 void PrintLog(char* iText)
@@ -110,10 +280,16 @@ void Debounce(uint8_t iSwitch,uint16_t* ioTimer, uint8_t* swPressed)
 
 
 
-#define ENTERBotton PORTBbits.RB0
-#define UPBotton    PORTBbits.RB1
-#define DOWNBotton  PORTBbits.RB2
-#define COMMANDOn PORTBbits.RB3
+#define ENTERBotton              PORTBbits.RB0
+#define ENTERBottonDirection     TRISBbits.TRISB0
+#define UPBotton                 PORTBbits.RB1
+#define UPBottonDirection        TRISBbits.TRISB1
+#define DOWNBotton               PORTBbits.RB2
+#define DOWNBottonDirection      TRISBbits.TRISB2
+#define COMMANDOnButton          PORTBbits.RB4
+#define COMMANDOnBottonDirection TRISBbits.TRISB4
+#define WELDOut                  PORTBbits.RB5
+#define WELDOutBottonDirection   TRISBbits.TRISB5
 
 #define DISPTACHERSIGNAL T1CONbits.TMR1CS
 
@@ -127,10 +303,10 @@ int16_t wTemperature=0;
 
 int16_t wTempSet=210;
 
-enum eMenuSpotWelding{eMenu=0, eSetSpotTime, ePowerDelevry, eRepeatCycle};
+enum eMenuSpotWelding{eMenu=0, eSetSpotTime, eManualMode, eRepeatCycle};
 enum eMenuHeating{eHMenu=0, eHSetHeatingTime, eHPowerDelevry};
 
-uint8_t wSpotTime=16;
+uint16_t wSpotTime=75;
 uint8_t wPowerDelevry=0;
 uint8_t wRepeatCycle=0;
 
@@ -160,7 +336,7 @@ void main(void)
   uint8_t wUpBottonPressed=0;
   uint8_t wDownBottonPressed=0;
   uint8_t wEnterBottonPressed=0;
-  uint8_t wCommandOn=0;
+  uint8_t wCommandOnPressed=0;
   
   uint8_t wEditingMode=0;
 
@@ -188,14 +364,28 @@ void main(void)
   OPTION_REGbits.PS = 0x2;
   OPTION_REGbits.TMR0CS = 0;
   OPTION_REGbits.PSA = 0;
-  INTCONbits.TMR0IE = 0; //Enable Timer 0 Interrupt
+  INTCONbits.TMR0IE = 0; //Disable Timer 0 Interrupt
   
   
   //Button configuration
   PORTB = 0x00;
   ANSELB = 0x00; //Setting All to digital
   TRISB = 0x0F; //Setting bit 0 1 2 3 to input
-  WPUB = 0x0F; // Activation of weak pull up
+  WPUB = 0x1F; // Activation of weak pull up
+
+    ENTERBotton=0;
+    UPBotton=0;
+    DOWNBotton=0;
+    COMMANDOnButton = 0;
+    WELDOut = 0;
+
+    ENTERBottonDirection = 1;     //Set as input
+    UPBottonDirection = 1;        //Set as input
+    DOWNBottonDirection = 1;      //Set as input
+    COMMANDOnBottonDirection = 1; //Set as input
+    WELDOutBottonDirection = 0;   //Set as output
+    APFCONbits.CCP2SEL=0;
+
   OPTION_REGbits.nWPUEN = 0; //Enable WeekPull up
   
     //Led configuration
@@ -208,9 +398,7 @@ void main(void)
   //INTCONbits.GIE = 1; //Enable interrupt
   
   initLCD();
-  
-   
-  
+
   clearDisplay();
   __delay_ms(100);
   powerOnLcd();
@@ -222,7 +410,6 @@ void main(void)
   setNotBlinkingCursor();
   __delay_ms(100);
  
-  
   int wCounter=0;
   char wConv[4]={'+',0, 'x',0, };
   int wTemp=0;
@@ -234,6 +421,23 @@ void main(void)
   
   setCursorPosition(0,0);      
  
+  
+/*  while(1)
+  {
+      Uint16ToTxt(TMR1,wPrintBuffer);
+      setCursorPosition(0,0);
+      lcdWriteTextFullLine(wPrintBuffer);
+      setCursorPosition(0,10);
+      lcdWriteTextFullLine("TMR1");
+      Uint8ToTxt(TMR0,wPrintBuffer);
+      setCursorPosition(1,0);
+      lcdWriteTextFullLine(wPrintBuffer);
+      setCursorPosition(1,10);
+      lcdWriteTextFullLine("TMR0");
+      __delay_ms(300);
+  }
+  
+  */
   while(1)
   {  
     if( wUpdateMenu )
@@ -258,9 +462,9 @@ void main(void)
                   setCursorPosition(1,0);
                   lcdWriteTextFullLine(wPrintBuffer);
                   break;       
-              case ePowerDelevry:
+              case eManualMode:
                   setCursorPosition(0,0);
-                  lcdWriteText("PowerDelevry           ");
+                  lcdWriteText("Manual Mode           ");
                   break;        
               case eRepeatCycle:
                   setCursorPosition(0,0);
@@ -311,7 +515,7 @@ void main(void)
    Debounce(ENTERBotton,&wDebounceEnter,&wEnterBottonPressed);
    Debounce(UPBotton,&wDebounceUp,&wUpBottonPressed);
    Debounce(DOWNBotton,&wDebounceDown,&wDownBottonPressed);
-   Debounce(COMMANDOn,&wDebounceCommandOn,&wCommandOn);
+   Debounce(COMMANDOnButton,&wDebounceCommandOn,&wCommandOnPressed);
    
 
    if(wUpBottonPressed == 1 )
@@ -327,7 +531,7 @@ void main(void)
                     {
                         case eMenu:
                         case eSetSpotTime:
-                        case ePowerDelevry:
+                        case eManualMode:
                             wMenuSpotWelding++;
                             break;        
                         case eRepeatCycle:
@@ -369,9 +573,9 @@ void main(void)
                             wMenu++;
                             break;
                         case eSetSpotTime:
-                            wSpotTime++;
+                            wSpotTime = wSpotTime+75;
                             break;
-                        case ePowerDelevry:
+                        case eManualMode:
                             wPowerDelevry++;
                             break;
                         case eRepeatCycle:
@@ -419,7 +623,7 @@ void main(void)
                             wMenuSpotWelding=eRepeatCycle;
                             break;
                         case eSetSpotTime:
-                        case ePowerDelevry:
+                        case eManualMode:
                         case eRepeatCycle:
                             wMenuSpotWelding--;
                             break; 
@@ -459,9 +663,9 @@ void main(void)
                             wMenu--;
                             break;
                         case eSetSpotTime:
-                            wSpotTime--;
+                            wSpotTime = wSpotTime-75;
                             break;
-                        case ePowerDelevry:
+                        case eManualMode:
                             wPowerDelevry--;
                             break;
                         case eRepeatCycle:
@@ -507,27 +711,26 @@ void main(void)
        {
          wEditingMode = 0;   
        }
-    }   
-  }
-  
-   if(wCommandOn == 1 )
+   }   
+   if(wCommandOnPressed == 1 )
    {
-        wCommandOn = 0;
+       setCursorPosition(3,10);
+      lcdWriteTextFullLine("On");
+      __delay_ms(1000);
+      setCursorPosition(3,10);
+      lcdWriteTextFullLine("Off");
+        wCommandOnPressed = 0;
         switch(wMenu)
         {
             case eSpotWelding:
                 switch(wMenuSpotWelding)
                 {
                     case eSetSpotTime:
-                        OPTION_REGbits.PSA=1; //Activation of the presacler on timer0
-                        OPTION_REGbits.PS0=1; //  1:256 prescaler
-                        OPTION_REGbits.PS1=1;
-                        OPTION_REGbits.PS2=1;
-                        TMR0=0;
-                        INTCONbits.TMR0IF=0;
-                        INTCONbits.TMR0IE=1;
+                        SetTimer1AndTimer0(((float)wSpotTime)/10000);
+                        WELDOut = 1;
+                        
                         break;
-                    case ePowerDelevry:
+                    case eManualMode:
                         break;
                     case eRepeatCycle:
                         break; 
@@ -542,56 +745,37 @@ void main(void)
                 break;
         }
     }
+  }
+  
+   
   return;
 }
 
 char wCounter2=0;
 void __interrupt() myint(void)
 {
+    /*static uint8_t wLast=0;
     if(INTCONbits.TMR0IF == 1)
     {
         INTCONbits.TMR0IF = 0;
-        INTCONbits.TMR0IE=1;
-        switch(wMenu)
-        {
-            case eSpotWelding:
-                switch(wMenuSpotWelding)
-                {
-                    case eSetSpotTime:
-                    case ePowerDelevry:
-                    case eRepeatCycle:
-                        
-                        break; 
-                    default:
-                        break;
-                }
-                break;
-            case eBoltHeating:
-                
-                break;
-            default:
-                break;
-        }
-        
-    }
+    }*/
     if(PIR1bits.TMR1IF == 1)
     {
-        wTimer1IntCounter++;
+        WELDOut = 0;
         PIR1bits.TMR1IF = 0;
-        
-        if(wTimer1IntCounter == 7)
-        {
-            TMR1H = 0x4C;
-            TMR1L = 0x83;
-        }
-        if(wTimer1IntCounter == 8)
-        {
-            wTimer1IntCounter = 0;
-        }
+        PIE1bits.TMR1IE = 0; //Disabling timer 1 interrupt
+        PIE1bits.TMR1GIE = 0; //disable the gate interrupt to reset the Pulse
+        T1CONbits.TMR1ON = 0;
     }
+    if(PIR1bits.TMR1GIF == 1)
+    {
+        PIR1bits.TMR1GIF =0;        
+        T1GCONbits.T1GGO_nDONE =1;
+    }
+    /*
     if(INTCONbits.TMR0IF == 1)
     {
         INTCONbits.TMR0IF = 0;
         wTimer0Counter++;
-    }
+    }*/
 }
