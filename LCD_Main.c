@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 
 
 // PIC16F1518 Configuration Bit Settings
@@ -47,6 +48,20 @@ uint8_t wTrial=0;
 
 
 uint8_t  gErrorCode;
+uint8_t PowInt(uint8_t iBase, uint8_t iExpo)
+{
+    uint8_t wReturn=1;
+
+    for(int i=0; i< iExpo ; i++)
+    {
+        wReturn = wReturn*iBase;
+    }
+    
+    return wReturn;
+
+    
+}
+
 void Uint8ToTxt(uint8_t iVal, char* oText )
 {
     uint8_t wTen;
@@ -277,7 +292,65 @@ void Debounce(uint8_t iSwitch,uint16_t* ioTimer, uint8_t* swPressed)
       *swPressed = 1;
     }
 }
+#define PWMOut                   PORTBbits.RB3
+#define PWMOutDirection          TRISBbits.TRISB3
+void SetPwmRB3(float iPeriod, float iDutyCycle)
+{
+    // PWM Setup
+    float wPeriod=0;
+    
+    PWMOut=0;
+    PWMOutDirection=1; // Disable pwm
+    CCP2CONbits.CCP2M = 12; // PWM MOde
+    T2CONbits.T2OUTPS = 0;
+    
+    if(iPeriod != wPeriod)
+    {
+        float wPeriodMax =  256.0*4.0*64.0 /_XTAL_FREQ ; //Prescaler max period length
 
+        if (wPeriodMax > (iPeriod))
+        {
+            T2CONbits.T2CKPS = 3;
+        }
+        else
+        {
+            __delay_ms(30);
+            setCursorPosition(3,0);
+            lcdWriteText("Error PWM out of range");
+            return;
+        }
+        if (wPeriodMax/4 > (iPeriod))
+        {
+            T2CONbits.T2CKPS = 2;
+        }
+        if (wPeriodMax/16 > (iPeriod))
+        {
+            T2CONbits.T2CKPS = 1;
+        }
+        if (wPeriodMax/64 > (iPeriod))
+        {
+            T2CONbits.T2CKPS = 0;
+        }
+
+        APFCONbits.CCP2SEL=1; // CCP2 function is on RB3
+        PR2 = (uint8_t)(iPeriod * _XTAL_FREQ / (4*(PowInt(4,T2CONbits.T2CKPS))))-1;
+        wPeriod = iPeriod;
+    }
+    
+    PIR1bits.TMR2IF=0;
+    float wPulseWidth = iDutyCycle * iPeriod;  //second
+    uint16_t wToSet=0;
+    
+    wToSet = (uint16_t)(wPulseWidth * _XTAL_FREQ / (PowInt(4,T2CONbits.T2CKPS)));
+    
+            
+    CCP2CONbits.DC2B = wToSet & 0x3; // LSB PWN duty cycle
+    CCPR2L = wToSet >> 2;  //MSB PWM pulse with
+    
+    T2CONbits.TMR2ON =1; //Activation of the TMR2
+    PWMOutDirection=0; // Activation of the PWM
+  
+}
 
 
 #define ENTERBotton              PORTBbits.RB0
@@ -295,7 +368,7 @@ void Debounce(uint8_t iSwitch,uint16_t* ioTimer, uint8_t* swPressed)
 
 uint8_t wTimer1IntCounter=0;
 uint8_t wTimer0Counter=0;
-uint8_t wMenuSpotWelding=0;
+uint8_t wMenuSpotWelding=1;
 uint8_t wMenuHeating=0;
 
 int16_t wHumidity=0;
@@ -306,7 +379,7 @@ int16_t wTempSet=210;
 enum eMenuSpotWelding{eMenu=0, eSetSpotTime, eManualMode, eRepeatCycle};
 enum eMenuHeating{eHMenu=0, eHSetHeatingTime, eHPowerDelevry};
 
-uint16_t wSpotTime=75;
+uint16_t wSpotTime=80;
 uint8_t wPowerDelevry=0;
 uint8_t wRepeatCycle=0;
 
@@ -324,7 +397,8 @@ void main(void)
     PCONbits.nBOR;  
   }
   OSCCONbits.SCS = 0x2; // Clock determined by FOSC<2:0> in Configuration Word 1
-  OSCCONbits.IRCF = 0xf; // Set frequency to 16 mhz not used since using external clock
+  //OSCCONbits.IRCF = 0xf; // Set frequency to 16 mhz not used since using external clock
+  OSCCONbits.IRCF = 13; // Set frequency to 500 khz not used since using external clock
   gErrorCode =0;
     
   char wPrintBuffer[20];
@@ -383,9 +457,10 @@ void main(void)
     UPBottonDirection = 1;        //Set as input
     DOWNBottonDirection = 1;      //Set as input
     COMMANDOnBottonDirection = 1; //Set as input
-    WELDOutBottonDirection = 0;   //Set as output
-    APFCONbits.CCP2SEL=0;
+    WELDOutBottonDirection = 0;   //Set as output  
 
+    
+    
   OPTION_REGbits.nWPUEN = 0; //Enable WeekPull up
   
     //Led configuration
@@ -419,8 +494,8 @@ void main(void)
   moveCursorToHome();
   __delay_ms(30);
   
-  setCursorPosition(0,0);      
- 
+  SetPwmRB3(0.0002,0.75);
+  
   
 /*  while(1)
   {
@@ -456,11 +531,11 @@ void main(void)
               case eSetSpotTime:
                   setCursorPosition(0,0);
                   lcdWriteText("SetSpotTime       ");
-                  setCursorPosition(1,0);
-                  Uint8ToTxt(wSpotTime,wPrintBuffer);
+                  Uint16DecimalToTxt(wSpotTime,wPrintBuffer);
                   strcat(wPrintBuffer," ms");
                   setCursorPosition(1,0);
                   lcdWriteTextFullLine(wPrintBuffer);
+               
                   break;       
               case eManualMode:
                   setCursorPosition(0,0);
@@ -573,7 +648,7 @@ void main(void)
                             wMenu++;
                             break;
                         case eSetSpotTime:
-                            wSpotTime = wSpotTime+75;
+                            wSpotTime = wSpotTime+80;
                             break;
                         case eManualMode:
                             wPowerDelevry++;
@@ -663,7 +738,7 @@ void main(void)
                             wMenu--;
                             break;
                         case eSetSpotTime:
-                            wSpotTime = wSpotTime-75;
+                            wSpotTime = wSpotTime-80;
                             break;
                         case eManualMode:
                             wPowerDelevry--;
@@ -726,7 +801,7 @@ void main(void)
                 switch(wMenuSpotWelding)
                 {
                     case eSetSpotTime:
-                        SetTimer1AndTimer0(((float)wSpotTime)/10000);
+                        SetTimer1AndTimer0(((float)wSpotTime-40)/10000);
                         WELDOut = 1;
                         
                         break;

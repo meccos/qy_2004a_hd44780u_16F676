@@ -2,7 +2,8 @@
 
 #include "stdint.h"
 
-#define _XTAL_FREQ 16000000 //for __delay_ms it need to know the cpu speed
+//#define _XTAL_FREQ 16000000 //for __delay_ms it need to know the cpu speed
+#define _XTAL_FREQ 4000000 //for __delay_ms it need to know the cpu speed
 
 #define wInterruptTextSize 75
 int test =0; 
